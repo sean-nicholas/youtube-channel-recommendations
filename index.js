@@ -46,7 +46,26 @@ server.addPage('/oauth2callback', lien => {
 
     oauth.setCredentials(tokens);
 
-    getSubscriptions({ mine: true }).then(data => console.log('Final', data))    
+    getSubscriptions({ mine: true }).then(subscriptions => {
+      console.log('subscriptions');
+      // return _.reduce(subscriptions, (result, sub) => {
+      //   console.log('reducing', sub.snippet.resourceId.channelId)
+      //   return result[sub.snippet.resourceId.channelId] = sub
+      // }, {})
+      const subs = _(subscriptions).flatten().reduce((result, sub) => {
+        console.log('reducing', sub.snippet.resourceId.channelId);
+        result[sub.snippet.resourceId.channelId] = sub;
+        return result;
+      }, {});
+
+      console.log(subs);
+
+      return subs;
+    }).then(data => {
+      console.log(data);
+      process.exit();
+    });
+
   });
 });
 
@@ -71,14 +90,10 @@ function getSubscriptions(options, subscriptions) {
     subscriptions = [];
   }
 
-  //TODO: Iteratively call getSubscriptions to get all Pages and join Data afterwards
   return _getSingleSubscriptionPage(options).then(data => {
     subscriptions.push(data.items);
 
-    console.log(subscriptions);
-
     if (data.nextPageToken) {
-      //TODO: Merge options with pageToken = data.nextPageToken
       return getSubscriptions(_.merge({}, options, { pageToken: data.nextPageToken }), subscriptions)
     }
     
