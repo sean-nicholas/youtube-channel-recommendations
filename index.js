@@ -46,30 +46,28 @@ server.addPage('/oauth2callback', lien => {
 
     oauth.setCredentials(tokens);
 
-    getSubscriptions({ mine: true }).then(subscriptions => {
-      console.log('subscriptions');
-      // return _.reduce(subscriptions, (result, sub) => {
-      //   console.log('reducing', sub.snippet.resourceId.channelId)
-      //   return result[sub.snippet.resourceId.channelId] = sub
-      // }, {})
+    getAllPages(Youtube.subscriptions.list, { mine: true }).then(subscriptions => {
       const subs = _(subscriptions).flatten().reduce((result, sub) => {
-        console.log('reducing', sub.snippet.resourceId.channelId);
         result[sub.snippet.resourceId.channelId] = sub;
         return result;
       }, {});
 
-      console.log(subs);
-
       return subs;
-    }).then(data => {
-      console.log(data);
+    })
+    // .then(subscriptions => {
+    //   return Promise.all(_.map(subscriptions, (sub, id) => {
+    //     return getSubscriptions({ channelId: id })
+    //   }));
+    // })
+    .then((data) => {
+      debugger;
       process.exit();
     });
 
   });
 });
 
-function _getSingleSubscriptionPage(paramOptions) {
+function _getSinglePage(func, paramOptions) {
   const defaultOptions = {
     part: 'snippet',
     maxResults: 50
@@ -78,25 +76,25 @@ function _getSingleSubscriptionPage(paramOptions) {
   const options = _.merge({}, defaultOptions, paramOptions)
 
   return new Promise((res, rej) => {
-    Youtube.subscriptions.list(options, (err, data) => {
+    func(options, (err, data) => {
       if (err) return rej(err);
       res(data);
     });
   });
 }
 
-function getSubscriptions(options, subscriptions) {
-  if (!subscriptions) {
-    subscriptions = [];
+function getAllPages(func, options, data) {
+  if (!data) {
+    data = [];
   }
 
-  return _getSingleSubscriptionPage(options).then(data => {
-    subscriptions.push(data.items);
+  return _getSinglePage(func, options).then(page => {
+    data.push(page.items);
 
-    if (data.nextPageToken) {
-      return getSubscriptions(_.merge({}, options, { pageToken: data.nextPageToken }), subscriptions)
+    if (page.nextPageToken) {
+      return _getAllPages(func, _.merge({}, options, { pageToken: page.nextPageToken }), data)
     }
     
-    return subscriptions;
+    return data;
   })
 }
