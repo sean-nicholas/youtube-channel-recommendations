@@ -98,7 +98,8 @@ server.addPage('/oauth2callback', lien => {
           fields: 'items(snippet(description,title))' // Maybe replace with: 'items(snippet(description,thumbnails,title))' 
         }).then(data => {
           const snippet = _.get(data, '[0].[0].snippet');
-          return _.merge({}, channel, { snippet: snippet });
+          const url = 'https://www.youtube.com/channel/' + channel.id;
+          return _.merge({}, channel, { url: url, snippet: snippet });
         })
       }))
     })
