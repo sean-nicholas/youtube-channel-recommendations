@@ -38,8 +38,8 @@ server.addPage('/oauth2callback', lien => {
   console.log('Trying to get the token using the following code: ', lien.query.code);
   oauth.getToken(lien.query.code, (err, tokens) => {
     if (err) {
-        lien.lien(err, 400);
-        return console.log(err);
+      lien.end('Error' + error)
+      return console.log(err);
     }
 
     console.log('Got the tokens.');
@@ -103,8 +103,10 @@ server.addPage('/oauth2callback', lien => {
       }))
     })
     .then((channels) => {
-      fs.writeFile('channels.json', JSON.stringify(channels), (err) => {
+      const stringified = JSON.stringify(channels, null, 4);
+      fs.writeFile('channels.json', stringified, (err) => {
         if (err) return console.log(err);
+        lien.end('<pre>' + stringified + '</pre>');
         process.exit();
       });
     });
