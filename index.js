@@ -46,22 +46,67 @@ server.addPage('/oauth2callback', lien => {
 
     oauth.setCredentials(tokens);
 
-    getAllPages(Youtube.subscriptions.list, { mine: true }).then(subscriptions => {
-      const subs = _(subscriptions).flatten().reduce((result, sub) => {
-        result[sub.snippet.resourceId.channelId] = sub;
+    const knownChannels = [];
+    getAllPages(Youtube.subscriptions.list, { mine: true })
+    .then(subscriptions => {
+      return _(subscriptions).flatten().reduce((result, sub) => {
+        const channelId = sub.snippet.resourceId.channelId;
+
+        knownChannels.push(channelId);
+        result[channelId] = sub;
+
         return result;
       }, {});
-
-      return subs;
     })
-    // .then(subscriptions => {
-    //   return Promise.all(_.map(subscriptions, (sub, id) => {
-    //     return getSubscriptions({ channelId: id })
-    //   }));
-    // })
-    .then((data) => {
-      debugger;
-      process.exit();
+    .then(subscriptions => {
+      //Get for each subscription the featuredChannels
+      return Promise.all(_.map(subscriptions, (sub, id) => {
+        return getAllPages(Youtube.channels.list, { 
+          id: id, 
+          part: 'brandingSettings', 
+          fields: 'items/brandingSettings/channel/featuredChannelsUrls' 
+        }).then(data => {
+          //Only return featuredChannels and nothing more
+          const featuredChannels = _.get(data, '[0].[0].brandingSettings.channel.featuredChannelsUrls');
+          return featuredChannels;
+        })
+      }));
+    })
+    .then(channelList => _.flatten(channelList))
+    .then(channels => _.difference(channels, knownChannels)) // Remove known channels
+    .then(channels => _.difference(channels, [undefined])) // Workaround: Sometimes a channel does not have featuredChannels
+    .then(channels => {
+      //Count occurrences
+      return _.reduce(channels, (result, channel) => {
+        result[channel] = (result[channel] || 0) + 1
+        return result;
+      }, {});
+    })
+    .then(counted => {
+      //Map for usage in orderBy
+      return _.map(counted, (count, id) => {
+        return { id: id, count: count }
+      });
+    })
+    .then(collection => _.orderBy(collection, ['count'], ['desc']))
+    .then(channels => _.take(channels, 30))
+    .then(channels => {
+      return Promise.all(_.map(channels, channel => {
+        return getAllPages(Youtube.channels.list, { 
+          id: channel.id, 
+          part: 'snippet', 
+          fields: 'items(snippet(description,title))' // Maybe replace with: 'items(snippet(description,thumbnails,title))' 
+        }).then(data => {
+          const snippet = _.get(data, '[0].[0].snippet');
+          return _.merge({}, channel, { snippet: snippet });
+        })
+      }))
+    })
+    .then((channels) => {
+      fs.writeFile('channels.json', JSON.stringify(channels), (err) => {
+        if (err) return console.log(err);
+        process.exit();
+      });
     });
 
   });
@@ -92,7 +137,7 @@ function getAllPages(func, options, data) {
     data.push(page.items);
 
     if (page.nextPageToken) {
-      return _getAllPages(func, _.merge({}, options, { pageToken: page.nextPageToken }), data)
+      return getAllPages(func, _.merge({}, options, { pageToken: page.nextPageToken }), data)
     }
     
     return data;
