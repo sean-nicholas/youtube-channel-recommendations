@@ -1,3 +1,4 @@
+'use strict';
 const _ = require('lodash')
 const Youtube = require('youtube-api')
 const fs = require('fs');
